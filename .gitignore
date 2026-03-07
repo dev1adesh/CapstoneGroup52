@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+
+# Cursor IDE
+.cursor/
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.toc
+
+# Python
+__pycache__/
+*.pyc

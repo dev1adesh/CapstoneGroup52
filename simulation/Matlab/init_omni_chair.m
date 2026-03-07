@@ -104,8 +104,11 @@ fprintf('  System CoM Height: %.3f m\n', system.CoM_height);
 % Based on rubber-on-rubber contact at small scale
 contact.k_stiffness = 1e6;                % Contact stiffness (N/m)
 contact.b_damping = 1e4;                  % Contact damping (N/(m/s))
-contact.mu_static = 0.8;                  % Static friction coefficient
-contact.mu_kinetic = 0.6;                 % Kinetic friction coefficient
+contact.mu_static = 0.8;                  % Static friction coefficient (no-slip)
+contact.mu_kinetic = 0.6;                 % Kinetic friction coefficient (no-slip)
+% For wheel–ball: if wheels "spin" / torques fight, use lower friction (allow slip):
+contact.mu_static_slip = 0.4;             % Static friction when allowing slip (recommended)
+contact.mu_kinetic_slip = 0.3;            % Kinetic friction when allowing slip
 contact.v_threshold = 0.001;              % Velocity threshold for friction transition (m/s)
 
 % Penetration depth for full damping

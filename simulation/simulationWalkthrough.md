@@ -296,7 +296,7 @@ If not already installed:
 
    - Main Ball position and velocity
    - Wheel rotations and speeds
-   - Platform orientation (pitch, roll, yaw)
+   - Platform orientation (roll, pitch, yaw); roll = X (bank), pitch = Y (nose up/down)
 
 3. Add **PS Simulink Converter** to send data to Simulink scopes
 
@@ -321,7 +321,7 @@ If not already installed:
 
 1. Create a subsystem called `Motor_Controller`
 2. Inputs:
-   - Platform tilt (roll, pitch) from IMU sensor
+   - Platform tilt (roll, pitch) from IMU; roll = X (bank), pitch = Y (nose)
    - Desired velocity (X, Y direction)
 3. Outputs:
    - Torque commands for 3 motors
