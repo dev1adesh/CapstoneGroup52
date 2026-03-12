@@ -17,24 +17,27 @@ static const float K_LQR[3][6] = {
   {  0.0f,  0.0f, 2.0f,  0.0f,  0.0f,  0.5f },  // yaw:   Kp=2, Kd=0.5
 };
 
-// ----- IK: 3-wheel ball balancer (matches simulation/ik_validation/ik.py) -----
-// alpha = 25.659 deg; wheels at 60°, 180°, 300°
+// ----- IK: 3-wheel ball balancer -----
+// Physical layout (top-down, IMU forward arrow = +Y = toward M2):
+//   M2 node1: 90°  (front)
+//   M1 node0: 210° (bottom-left)
+//   M3 node2: 330° (bottom-right)
 static const float ALPHA_RAD = 25.659f * (PI / 180.0f);
 static const float CA = cosf(ALPHA_RAD);
 static const float SA = sinf(ALPHA_RAD);
-static const float C1 = 0.5f;      // cos(60°)
-static const float S1 = 0.866025f;  // sin(60°)
-static const float C2 = -1.0f;      // cos(180°)
-static const float S2 = 0.0f;
-static const float C3 = 0.5f;       // cos(300°)
-static const float S3 = -0.866025f; // sin(300°)
+static const float C1 = -0.866025f;  // cos(210°) — M1 node0, bottom-left
+static const float S1 = -0.5f;        // sin(210°)
+static const float C2 =  0.0f;        // cos(90°)  — M2 node1, front
+static const float S2 =  1.0f;        // sin(90°)
+static const float C3 =  0.866025f;  // cos(330°) — M3 node2, bottom-right
+static const float S3 = -0.5f;        // sin(330°)
 // Max velocity per wheel (rad/s). Hard cap on correction speed — safe for testing.
 // Increase once motor directions are verified correct.
 static const float IK_MAX_TORQUE = 1.5f;   // reused as IK_MAX_VEL in velocity mode
 static const float VEL_MAX_LQR   = 1.5f;   // secondary clamp after IK
 
-// Remap: swap roll/pitch to match Simulink (remap.py REMAP_SWAP = true)
-#define LQR_REMAP_SWAP 1
+// Remap: disabled — no longer needed now that wheel angles match physical layout
+#define LQR_REMAP_SWAP 0
 
 // Safety tilt cutoff: if |roll| or |pitch| exceeds this, zero all torques.
 // Beyond this angle the system can't recover and motors would just spin dangerously.

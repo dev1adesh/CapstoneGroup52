@@ -28,13 +28,14 @@ VEL_MAX_LQR   = 1.5
 ALPHA_RAD     = np.radians(25.659)
 CA            = np.cos(ALPHA_RAD)
 SA            = np.sin(ALPHA_RAD)
-WHEEL_ANGLES  = np.radians([60.0, 180.0, 300.0])   # node 0, 1, 2
+# Physical layout: M2(front)=90°, M1(bottom-left)=210°, M3(bottom-right)=330°
+WHEEL_ANGLES  = np.radians([210.0, 90.0, 330.0])   # node 0 (M1), node 1 (M2), node 2 (M3)
 MOTOR_SIGNS   = np.array([1.0, -1.0, 1.0])
-LQR_REMAP_SWAP = True
+LQR_REMAP_SWAP = False   # disabled — wheel angles now match physical layout
 INVERT_ROLL    = True
 
 WHEEL_COLORS = ['#e74c3c', '#2ecc71', '#3498db']
-WHEEL_NAMES  = ['M1 node0\n(60°)', 'M2 node1\n(180°)', 'M3 node2\n(300°)']
+WHEEL_NAMES  = ['M1 node0\n(210°, BL)', 'M2 node1\n(90°, Front)', 'M3 node2\n(330°, BR)']
 
 # ============================================================
 # Control math  (exact translation of Arduino code)
