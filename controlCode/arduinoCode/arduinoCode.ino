@@ -78,6 +78,7 @@ void setup() {
   Serial.print("Nodes: n0="); Serial.print(motor_isNodePresent(0));
   Serial.print(" n1="); Serial.print(motor_isNodePresent(1));
   Serial.print(" n2="); Serial.println(motor_isNodePresent(2));
+  motor_sendTorques(0.0f, 0.0f, 0.0f);  // hold motors at zero until control loop starts
 
 #if RUN_MOTOR_SPIN_CHECK
   {

@@ -7,14 +7,13 @@
 #include <math.h>
 
 // ----- PD gains K (3x6): u = -K @ (x - x_ref) -----
-// Kp (cols 0-2) must exceed M*g*h to overcome gravity:
-//   ~44 N·m/rad for 30kg platform @ 0.15m CoM,  ~157 for 80kg+person @ 0.2m.
-// Kd (cols 3-5) provides damping. Increase if oscillating, decrease if sluggish.
-// Tune on hardware: start here, adjust in 25% steps.
+// Kp (cols 0-2): corrective torque per radian of tilt.
+// Kd (cols 3-5): damping torque per rad/s. Increase Kd if oscillating.
+// Tune on hardware: increase Kp in 10-unit steps if too weak, reduce if too fast.
 static const float K_LQR[3][6] = {
-  { 200.0f,   0.0f,  0.0f,   30.0f,  0.0f,  0.0f },  // roll:  Kp=200, Kd=30
-  {   0.0f, 200.0f,  0.0f,    0.0f, 30.0f,  0.0f },  // pitch: Kp=200, Kd=30
-  {   0.0f,   0.0f, 20.0f,    0.0f,  0.0f,  8.0f },  // yaw:   Kp=20,  Kd=8
+  { 60.0f,  0.0f, 0.0f,  15.0f,  0.0f,  0.0f },  // roll:  Kp=60, Kd=15
+  {  0.0f, 60.0f, 0.0f,   0.0f, 15.0f,  0.0f },  // pitch: Kp=60, Kd=15
+  {  0.0f,  0.0f, 8.0f,   0.0f,  0.0f,  4.0f },  // yaw:   Kp=8,  Kd=4
 };
 
 // ----- IK: 3-wheel ball balancer (matches simulation/ik_validation/ik.py) -----
@@ -28,7 +27,8 @@ static const float C2 = -1.0f;      // cos(180°)
 static const float S2 = 0.0f;
 static const float C3 = 0.5f;       // cos(300°)
 static const float S3 = -0.866025f; // sin(300°)
-static const float IK_MAX_TORQUE = 5.0f;
+// Max torque per wheel (N·m). Keep low for initial testing — increase once direction is verified.
+static const float IK_MAX_TORQUE = 1.0f;
 
 // Remap: swap roll/pitch to match Simulink (remap.py REMAP_SWAP = true)
 #define LQR_REMAP_SWAP 1

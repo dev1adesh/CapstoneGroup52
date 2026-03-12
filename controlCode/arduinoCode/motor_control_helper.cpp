@@ -35,6 +35,7 @@ struct ODriveUserData {
   bool received_heartbeat = false;
   uint32_t last_hb_ms = 0;
   bool configured_velocity_mode = false;
+  bool configured_torque_mode = false;
 };
 
 static ODriveUserData u0, u1, u2;
@@ -80,10 +81,14 @@ static void ensureTorqueMode(ODriveCAN& odrv, ODriveUserData& u) {
   if (u.last_heartbeat.Axis_State != ODriveAxisState::AXIS_STATE_CLOSED_LOOP_CONTROL) {
     odrv.clearErrors();
     odrv.setState(ODriveAxisState::AXIS_STATE_CLOSED_LOOP_CONTROL);
+    u.configured_torque_mode = false;  // re-configure after state transition
     return;
   }
-  odrv.setControllerMode(ODriveControlMode::CONTROL_MODE_TORQUE_CONTROL,
-                         ODriveInputMode::INPUT_MODE_PASSTHROUGH);
+  if (!u.configured_torque_mode) {
+    odrv.setControllerMode(ODriveControlMode::CONTROL_MODE_TORQUE_CONTROL,
+                           ODriveInputMode::INPUT_MODE_PASSTHROUGH);
+    u.configured_torque_mode = true;
+  }
 }
 
 bool motor_init(void) {
