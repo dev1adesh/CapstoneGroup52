@@ -12,9 +12,9 @@
 // Kd (cols 3-5): damping. Increase if oscillating, decrease if sluggish.
 // Tune: increase Kp in steps of 2 if too weak, reduce if overshooting.
 static const float K_LQR[3][6] = {
-  { 10.0f,  0.0f, 0.0f,  2.0f,  0.0f,  0.0f },  // roll:  Kp=10, Kd=2
-  {  0.0f, 10.0f, 0.0f,  0.0f,  2.0f,  0.0f },  // pitch: Kp=10, Kd=2
-  {  0.0f,  0.0f, 3.0f,  0.0f,  0.0f,  1.0f },  // yaw:   Kp=3,  Kd=1
+  { 5.0f,  0.0f, 0.0f,  1.0f,  0.0f,  0.0f },  // roll:  Kp=5, Kd=1
+  {  0.0f, 5.0f, 0.0f,  0.0f,  1.0f,  0.0f },  // pitch: Kp=5, Kd=1
+  {  0.0f,  0.0f, 2.0f,  0.0f,  0.0f,  0.5f },  // yaw:   Kp=2, Kd=0.5
 };
 
 // ----- IK: 3-wheel ball balancer (matches simulation/ik_validation/ik.py) -----
@@ -30,8 +30,8 @@ static const float C3 = 0.5f;       // cos(300°)
 static const float S3 = -0.866025f; // sin(300°)
 // Max velocity per wheel (rad/s). Hard cap on correction speed — safe for testing.
 // Increase once motor directions are verified correct.
-static const float IK_MAX_TORQUE = 3.0f;   // reused as IK_MAX_VEL in velocity mode
-static const float VEL_MAX_LQR   = 3.0f;   // secondary clamp after IK
+static const float IK_MAX_TORQUE = 1.5f;   // reused as IK_MAX_VEL in velocity mode
+static const float VEL_MAX_LQR   = 1.5f;   // secondary clamp after IK
 
 // Remap: swap roll/pitch to match Simulink (remap.py REMAP_SWAP = true)
 #define LQR_REMAP_SWAP 1
