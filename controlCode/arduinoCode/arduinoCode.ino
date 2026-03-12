@@ -5,13 +5,10 @@
  * USE_USER_LEAN_REFERENCE: 1 = LQR reference from IMU B (user lean); 0 = chassis only, ref = upright (0,0,0).
  * INVERT_ROLL: 1 = flip sign of roll (state and ref) so positive roll direction matches hardware.
  * RUN_MOTOR_SPIN_CHECK: 1 = at startup, spin each motor + then - to verify direction vs simulation.
- * USE_IMU_B_AS_PLATFORM: 1 = use IMU B angles as platform state (testing only; no gyro -> Kd inactive).
- *                         0 = normal operation with IMU A as platform.
  */
 #define USE_USER_LEAN_REFERENCE 0
 #define INVERT_ROLL 1
 #define RUN_MOTOR_SPIN_CHECK 0
-#define USE_IMU_B_AS_PLATFORM 1
 
 #include "sensor_helper.h"
 #include "control_helper.h"
@@ -134,11 +131,6 @@ void setup() {
   }
 #endif
 
-#if USE_IMU_B_AS_PLATFORM
-  Serial.println("Platform IMU: B (TESTING MODE - Kd inactive, no gyro)");
-#else
-  Serial.println("Platform IMU: A (normal)");
-#endif
 #if USE_USER_LEAN_REFERENCE
   Serial.println("Mode: LQR with user lean (x_ref from IMU B)");
 #else
@@ -161,23 +153,15 @@ void loop() {
   sensor_readImuA(&dummy);           // update IMU A display
   sensor_readControlAxis(&dummy);     // update IMU B (roll, pitch, yaw) and display
 
-  // LQR state x: normally from IMU A; USE_IMU_B_AS_PLATFORM swaps in IMU B for testing.
+  // LQR: state x from IMU A (platform); x_ref = user lean (IMU B) or upright (0) per flag.
+  // Subtract zeros so orientation at reset/calibration is (0,0,0).
   float x[6], x_ref[6];
-#if USE_IMU_B_AS_PLATFORM
-  // IMU B has no gyro -> omega terms = 0 (Kd inactive during this test)
-  float pr0, pp0, py0;
-  sensor_getImuB_EulerRad(&x[0], &x[1], &x[2]);
-  sensor_getEulerZeroRad(&pr0, &pp0, &py0);
-  x[0] -= pr0;  x[1] -= pp0;  x[2] -= py0;
-  x[3] = 0.0f;  x[4] = 0.0f;  x[5] = 0.0f;
-#else
   sensor_getImuA_StateRad(&x[0], &x[1], &x[2], &x[3], &x[4], &x[5]);
   float pr0, pp0, py0;
   sensor_getPlatformZeroRad(&pr0, &pp0, &py0);
   x[0] -= pr0;
   x[1] -= pp0;
   x[2] -= py0;
-#endif
 
 #if USE_USER_LEAN_REFERENCE
   float rollB, pitchB, yawB;
@@ -210,25 +194,15 @@ void loop() {
   static uint32_t last_print = 0;
   if (millis() - last_print > 200) {
     last_print = millis();
-    const float rad2deg = 180.0f / PI;
-    float disp_roll, disp_pitch, disp_yaw;
-#if USE_IMU_B_AS_PLATFORM
-    float bz0, bz1, bz2;
-    sensor_getEulerZeroRad(&bz0, &bz1, &bz2);
-    disp_roll  = (x[0] + pr0) * rad2deg - bz0 * rad2deg;  // already zeroed in x
-    disp_roll  = x[0] * rad2deg;
-    disp_pitch = x[1] * rad2deg;
-    disp_yaw   = x[2] * rad2deg;
-#else
     float yawA, pitchA, rollA;
     sensor_getImuA_EulerDeg(&yawA, &pitchA, &rollA);
-    disp_roll  = rollA  - (pr0 * rad2deg);
-    disp_pitch = pitchA - (pp0 * rad2deg);
-    disp_yaw   = yawA   - (py0 * rad2deg);
-#endif
+    const float rad2deg = 180.0f / PI;
+    float rollA_z  = rollA  - (pr0 * rad2deg);
+    float pitchA_z = pitchA - (pp0 * rad2deg);
+    float yawA_z   = yawA   - (py0 * rad2deg);
 #if INVERT_ROLL
-    disp_roll = -disp_roll;
+    rollA_z = -rollA_z;  // display matches what controller sees
 #endif
-    printRow(disp_roll, disp_pitch, disp_yaw, x[3], x[4], x[5], tau_roll, tau_pitch, tau_yaw, v1, v2, v3);
+    printRow(rollA_z, pitchA_z, yawA_z, x[3], x[4], x[5], tau_roll, tau_pitch, tau_yaw, v1, v2, v3);
   }
 }
