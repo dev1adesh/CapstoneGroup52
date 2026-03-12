@@ -15,6 +15,13 @@ struct ODriveStatus; // Teensy compile hack
 #define HEARTBEAT_TIMEOUT_MS 500
 #define SENTINEL_NO_SEND -99.0f
 
+// Per-motor sign: +1.0 or -1.0. Flip if a motor drives the ball the wrong way.
+// To test: tilt platform in one direction, check serial output. If a motor's torque
+// pushes the tilt further instead of correcting, flip that motor's sign.
+static const float MOTOR_SIGN_0 =  1.0f;  // Motor 1 (ODrive node 0, wheel at 60°)
+static const float MOTOR_SIGN_1 =  1.0f;  // Motor 2 (ODrive node 1, wheel at 180°)
+static const float MOTOR_SIGN_2 =  1.0f;  // Motor 3 (ODrive node 2, wheel at 300°)
+
 struct ODriveStatus;
 
 static float last_sent_v1 = SENTINEL_NO_SEND;
@@ -66,6 +73,17 @@ static void ensureVelocityMode(ODriveCAN& odrv, ODriveUserData& u) {
                            ODriveInputMode::INPUT_MODE_PASSTHROUGH);
     u.configured_velocity_mode = true;
   }
+}
+
+static void ensureTorqueMode(ODriveCAN& odrv, ODriveUserData& u) {
+  if (!isPresent(u)) return;
+  if (u.last_heartbeat.Axis_State != ODriveAxisState::AXIS_STATE_CLOSED_LOOP_CONTROL) {
+    odrv.clearErrors();
+    odrv.setState(ODriveAxisState::AXIS_STATE_CLOSED_LOOP_CONTROL);
+    return;
+  }
+  odrv.setControllerMode(ODriveControlMode::CONTROL_MODE_TORQUE_CONTROL,
+                         ODriveInputMode::INPUT_MODE_PASSTHROUGH);
 }
 
 bool motor_init(void) {
@@ -135,6 +153,28 @@ int motor_getAxisState(int node_index) {
   if (node_index == 1) return (int)u1.last_heartbeat.Axis_State;
   if (node_index == 2) return (int)u2.last_heartbeat.Axis_State;
   return 0;
+}
+
+void motor_sendTorques(float t1, float t2, float t3) {
+  last_sent_v1 = SENTINEL_NO_SEND;
+  last_sent_v2 = SENTINEL_NO_SEND;
+  last_sent_v3 = SENTINEL_NO_SEND;
+
+  if (isPresent(u0)) {
+    ensureTorqueMode(odrv0, u0);
+    odrv0.setTorque(MOTOR_SIGN_0 * t1);
+    last_sent_v1 = MOTOR_SIGN_0 * t1;
+  }
+  if (isPresent(u1)) {
+    ensureTorqueMode(odrv1, u1);
+    odrv1.setTorque(MOTOR_SIGN_1 * t2);
+    last_sent_v2 = MOTOR_SIGN_1 * t2;
+  }
+  if (isPresent(u2)) {
+    ensureTorqueMode(odrv2, u2);
+    odrv2.setTorque(MOTOR_SIGN_2 * t3);
+    last_sent_v3 = MOTOR_SIGN_2 * t3;
+  }
 }
 
 void motor_getLastSent(float* v1, float* v2, float* v3) {

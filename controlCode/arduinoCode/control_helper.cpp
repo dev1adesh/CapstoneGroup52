@@ -6,11 +6,15 @@
 #include <Arduino.h>
 #include <math.h>
 
-// ----- LQR gain K (3x6): u = -K @ (x - x_ref). From simulation/ik_validation/lqr.py -----
+// ----- PD gains K (3x6): u = -K @ (x - x_ref) -----
+// Kp (cols 0-2) must exceed M*g*h to overcome gravity:
+//   ~44 N·m/rad for 30kg platform @ 0.15m CoM,  ~157 for 80kg+person @ 0.2m.
+// Kd (cols 3-5) provides damping. Increase if oscillating, decrease if sluggish.
+// Tune on hardware: start here, adjust in 25% steps.
 static const float K_LQR[3][6] = {
-  { 343.068682f,  0.0f, 0.0f, 14.815250f, 0.0f, 0.0f },
-  { 0.0f, 326.183053f, 0.0f, 0.0f, 14.760023f, 0.0f },
-  { 0.0f, 0.0f, 31.622777f, 0.0f, 0.0f, 9.798879f },
+  { 200.0f,   0.0f,  0.0f,   30.0f,  0.0f,  0.0f },  // roll:  Kp=200, Kd=30
+  {   0.0f, 200.0f,  0.0f,    0.0f, 30.0f,  0.0f },  // pitch: Kp=200, Kd=30
+  {   0.0f,   0.0f, 20.0f,    0.0f,  0.0f,  8.0f },  // yaw:   Kp=20,  Kd=8
 };
 
 // ----- IK: 3-wheel ball balancer (matches simulation/ik_validation/ik.py) -----
@@ -29,15 +33,12 @@ static const float IK_MAX_TORQUE = 5.0f;
 // Remap: swap roll/pitch to match Simulink (remap.py REMAP_SWAP = true)
 #define LQR_REMAP_SWAP 1
 
-// Torque to velocity scaling for ODrive (tune for your motors)
-static const float K_TAU_TO_VEL = 2.0f;
-static const float VEL_MAX_LQR = 10.0f;
-// Scale down overall velocity commands (0.0 to 1.0). Increase toward 1.0 for stronger response.
-static const float VEL_SCALE = 0.6f;
+// Safety tilt cutoff: if |roll| or |pitch| exceeds this, zero all torques.
+// Beyond this angle the system can't recover and motors would just spin dangerously.
+static const float SAFETY_TILT_RAD = 0.44f;  // ~25 degrees
 
-// LQR deadzone: angle errors within ±5° of (0,0,0) are zeroed (platform can't be perfectly level).
-static const float LQR_DEADZONE_DEG = 0.0f;
-static const float LQR_DEADZONE_RAD = LQR_DEADZONE_DEG * (PI / 180.0f);
+// Deadzone: set to 0 for best balancing (react to smallest tilt immediately).
+static const float LQR_DEADZONE_RAD = 0.0f;
 
 static const float DELTA_DEADBAND_RAD   = 0.06f;
 static const float DELTA_FULLSCALE_RAD  = 0.60f;
@@ -53,12 +54,11 @@ static const float SINE_PERIOD_S = 2.0f;
 static const float SINE_AMPL     = 1.0f;
 static const float V_MAX = SINE_AMPL * (TWO_PI / SINE_PERIOD_S);
 
-// Integral state for roll and pitch (anti-drift / steady-state correction)
+// Integral state (disabled for initial PD tuning; enable after balancing works)
 static float integral_roll  = 0.0f;
 static float integral_pitch = 0.0f;
-// Integral gain: small, just enough to null steady-state offset. Tune carefully.
-static const float K_I_ROLL  = 5.0f;
-static const float K_I_PITCH = 5.0f;
+static const float K_I_ROLL  = 0.0f;  // set >0 (e.g. 5.0) once PD balances
+static const float K_I_PITCH = 0.0f;
 // Integral windup clamp (radians·seconds)
 static const float INTEGRAL_CLAMP = 0.3f;
 static uint32_t last_lqr_ms = 0;
@@ -193,28 +193,24 @@ void control_updateLQR(const float x[6], const float x_ref[6],
   tau_pitch = tmp;
 #endif
 
+  // Safety: if tilted beyond recovery, zero everything to prevent runaway
+  if (fabsf(e[0]) > SAFETY_TILT_RAD || fabsf(e[1]) > SAFETY_TILT_RAD) {
+    *v1 = 0.0f; *v2 = 0.0f; *v3 = 0.0f;
+    if (tau_roll_out)  *tau_roll_out  = 0.0f;
+    if (tau_pitch_out) *tau_pitch_out = 0.0f;
+    if (tau_yaw_out)   *tau_yaw_out   = 0.0f;
+    return;
+  }
+
   if (tau_roll_out)  *tau_roll_out  = tau_roll;
   if (tau_pitch_out) *tau_pitch_out = tau_pitch;
   if (tau_yaw_out)   *tau_yaw_out   = tau_yaw;
 
+  // IK: body torques -> wheel torques. Sent directly to ODrive in torque mode.
   float T1, T2, T3;
   ik(tau_roll, tau_pitch, tau_yaw, &T1, &T2, &T3);
 
-  float v1_out = K_TAU_TO_VEL * T1;
-  float v2_out = K_TAU_TO_VEL * T2;
-  float v3_out = K_TAU_TO_VEL * T3;
-  if (v1_out > VEL_MAX_LQR) v1_out = VEL_MAX_LQR;
-  if (v1_out < -VEL_MAX_LQR) v1_out = -VEL_MAX_LQR;
-  if (v2_out > VEL_MAX_LQR) v2_out = VEL_MAX_LQR;
-  if (v2_out < -VEL_MAX_LQR) v2_out = -VEL_MAX_LQR;
-  if (v3_out > VEL_MAX_LQR) v3_out = VEL_MAX_LQR;
-  if (v3_out < -VEL_MAX_LQR) v3_out = -VEL_MAX_LQR;
-
-  v1_out *= VEL_SCALE;
-  v2_out *= VEL_SCALE;
-  v3_out *= VEL_SCALE;
-
-  *v1 = v1_out;
-  *v2 = v2_out;
-  *v3 = v3_out;
+  *v1 = T1;
+  *v2 = T2;
+  *v3 = T3;
 }

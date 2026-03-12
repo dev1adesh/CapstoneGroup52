@@ -17,7 +17,7 @@
 static uint32_t last_update_ms = 0;
 
 static void printHeader(void) {
-  Serial.println("IMU_A: Roll   Pitch  Yaw   | omega_R   omega_P   omega_Y (rad/s) | tau_R   tau_P   tau_Y  | n0 n1 n2  | v1    v2    v3");
+  Serial.println("IMU_A: Roll   Pitch  Yaw   | omega_R   omega_P   omega_Y (rad/s) | tau_R   tau_P   tau_Y  | n0 n1 n2  | T1    T2    T3 (Nm)");
 }
 
 static void printRow(float rollA, float pitchA, float yawA, float omega_r, float omega_p, float omega_y, float tau_r, float tau_p, float tau_y, float v1, float v2, float v3) {
@@ -185,10 +185,10 @@ void loop() {
   x_ref[0] = -x_ref[0];
 #endif
 
-  float v1, v2, v3, tau_roll, tau_pitch, tau_yaw;
-  control_updateLQR(x, x_ref, &v1, &v2, &v3, &tau_roll, &tau_pitch, &tau_yaw);
+  float t1, t2, t3, tau_roll, tau_pitch, tau_yaw;
+  control_updateLQR(x, x_ref, &t1, &t2, &t3, &tau_roll, &tau_pitch, &tau_yaw);
 
-  motor_sendVelocities(v1, v2, v3);
+  motor_sendTorques(t1, t2, t3);
 
   static uint32_t last_print = 0;
   if (millis() - last_print > 200) {
@@ -204,6 +204,6 @@ void loop() {
 #if INVERT_ROLL
     rollA_z = -rollA_z;  // display matches what controller sees
 #endif
-    printRow(rollA_z, pitchA_z, yawA_z, x[3], x[4], x[5], tau_roll, tau_pitch, tau_yaw, v1, v2, v3);
+    printRow(rollA_z, pitchA_z, yawA_z, x[3], x[4], x[5], tau_roll, tau_pitch, tau_yaw, t1, t2, t3);
   }
 }

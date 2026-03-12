@@ -17,6 +17,9 @@ void motor_sendVelocity(float vel_cmd);
 // Send per-motor velocities: motor 1 (node0)=v1, motor 2 (node1)=v2, motor 3 (node2)=v3. Positive = CW.
 void motor_sendVelocities(float v1, float v2, float v3);
 
+// Send per-motor torques (N·m) in torque control mode. Per-motor signs applied internally.
+void motor_sendTorques(float t1, float t2, float t3);
+
 // Returns true if the given node (0, 1, or 2) has sent a heartbeat recently.
 bool motor_isNodePresent(int node_index);
 
