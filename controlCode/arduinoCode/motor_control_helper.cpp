@@ -19,7 +19,7 @@ struct ODriveStatus; // Teensy compile hack
 // To test: tilt platform in one direction, check serial output. If a motor's torque
 // pushes the tilt further instead of correcting, flip that motor's sign.
 static const float MOTOR_SIGN_0 =  1.0f;  // Motor 1 (ODrive node 0, wheel at 60°)
-static const float MOTOR_SIGN_1 = -1.0f;  // Motor 2 (ODrive node 1, wheel at 180°)
+static const float MOTOR_SIGN_1 =  -1.0f;  // Motor 2 (ODrive node 1, wheel at 180°)
 static const float MOTOR_SIGN_2 =  1.0f;  // Motor 3 (ODrive node 2, wheel at 300°)
 
 struct ODriveStatus;
