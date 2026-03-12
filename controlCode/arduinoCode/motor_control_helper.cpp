@@ -131,18 +131,18 @@ void motor_sendVelocities(float v1, float v2, float v3) {
 
   if (isPresent(u0)) {
     ensureVelocityMode(odrv0, u0);
-    odrv0.setVelocity(v1);
-    last_sent_v1 = v1;
+    odrv0.setVelocity(MOTOR_SIGN_0 * v1);
+    last_sent_v1 = MOTOR_SIGN_0 * v1;
   }
   if (isPresent(u1)) {
     ensureVelocityMode(odrv1, u1);
-    odrv1.setVelocity(v2);
-    last_sent_v2 = v2;
+    odrv1.setVelocity(MOTOR_SIGN_1 * v2);
+    last_sent_v2 = MOTOR_SIGN_1 * v2;
   }
   if (isPresent(u2)) {
     ensureVelocityMode(odrv2, u2);
-    odrv2.setVelocity(v3);
-    last_sent_v3 = v3;
+    odrv2.setVelocity(MOTOR_SIGN_2 * v3);
+    last_sent_v3 = MOTOR_SIGN_2 * v3;
   }
 }
 

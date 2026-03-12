@@ -6,14 +6,15 @@
 #include <Arduino.h>
 #include <math.h>
 
-// ----- PD gains K (3x6): u = -K @ (x - x_ref) -----
-// Kp (cols 0-2): corrective torque per radian of tilt.
-// Kd (cols 3-5): damping torque per rad/s. Increase Kd if oscillating.
-// Tune on hardware: increase Kp in 10-unit steps if too weak, reduce if too fast.
+// ----- PD velocity gains K (3x6): u = -K @ (x - x_ref) -> body velocity targets (rad/s) -----
+// Kp (cols 0-2): wheel speed (rad/s) commanded per radian of tilt.
+//   At Kp=10: a 10 deg (0.175 rad) tilt commands ~1.75 rad/s body correction.
+// Kd (cols 3-5): damping. Increase if oscillating, decrease if sluggish.
+// Tune: increase Kp in steps of 2 if too weak, reduce if overshooting.
 static const float K_LQR[3][6] = {
-  { 60.0f,  0.0f, 0.0f,  15.0f,  0.0f,  0.0f },  // roll:  Kp=60, Kd=15
-  {  0.0f, 60.0f, 0.0f,   0.0f, 15.0f,  0.0f },  // pitch: Kp=60, Kd=15
-  {  0.0f,  0.0f, 8.0f,   0.0f,  0.0f,  4.0f },  // yaw:   Kp=8,  Kd=4
+  { 10.0f,  0.0f, 0.0f,  2.0f,  0.0f,  0.0f },  // roll:  Kp=10, Kd=2
+  {  0.0f, 10.0f, 0.0f,  0.0f,  2.0f,  0.0f },  // pitch: Kp=10, Kd=2
+  {  0.0f,  0.0f, 3.0f,  0.0f,  0.0f,  1.0f },  // yaw:   Kp=3,  Kd=1
 };
 
 // ----- IK: 3-wheel ball balancer (matches simulation/ik_validation/ik.py) -----
@@ -27,8 +28,10 @@ static const float C2 = -1.0f;      // cos(180°)
 static const float S2 = 0.0f;
 static const float C3 = 0.5f;       // cos(300°)
 static const float S3 = -0.866025f; // sin(300°)
-// Max torque per wheel (N·m). Keep low for initial testing — increase once direction is verified.
-static const float IK_MAX_TORQUE = 1.0f;
+// Max velocity per wheel (rad/s). Hard cap on correction speed — safe for testing.
+// Increase once motor directions are verified correct.
+static const float IK_MAX_TORQUE = 3.0f;   // reused as IK_MAX_VEL in velocity mode
+static const float VEL_MAX_LQR   = 3.0f;   // secondary clamp after IK
 
 // Remap: swap roll/pitch to match Simulink (remap.py REMAP_SWAP = true)
 #define LQR_REMAP_SWAP 1
@@ -206,11 +209,13 @@ void control_updateLQR(const float x[6], const float x_ref[6],
   if (tau_pitch_out) *tau_pitch_out = tau_pitch;
   if (tau_yaw_out)   *tau_yaw_out   = tau_yaw;
 
-  // IK: body torques -> wheel torques. Sent directly to ODrive in torque mode.
+  // IK: body velocity targets -> wheel velocity commands (same geometry as torque IK).
   float T1, T2, T3;
   ik(tau_roll, tau_pitch, tau_yaw, &T1, &T2, &T3);
 
-  *v1 = T1;
-  *v2 = T2;
-  *v3 = T3;
+  // Clamp per-wheel velocity
+  auto clamp = [](float v, float lim) { return v > lim ? lim : (v < -lim ? -lim : v); };
+  *v1 = clamp(T1, VEL_MAX_LQR);
+  *v2 = clamp(T2, VEL_MAX_LQR);
+  *v3 = clamp(T3, VEL_MAX_LQR);
 }
