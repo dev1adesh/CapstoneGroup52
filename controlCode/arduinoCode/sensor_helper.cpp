@@ -62,10 +62,10 @@ bool sensor_init(void) {
   if (!imuA.begin(IMU_A_ADDR, Wire2)) {
     return false;
   }
-  if (!imuA.enableRotationVector(50)) {
+  if (!imuA.enableRotationVector(10)) {  // 10ms = 100Hz
     return false;
   }
-  if (!imuA.enableGyro(50)) {
+  if (!imuA.enableGyro(10)) {  // 10ms = 100Hz
     return false;
   }
   delay(100);
@@ -73,7 +73,7 @@ bool sensor_init(void) {
   if (!imuB.begin(IMU_B_ADDR, Wire2)) {
     return false;
   }
-  imuB.enableRotationVector(20);
+  imuB.enableRotationVector(10);  // 10ms = 100Hz
   delay(100);
   return true;
 }

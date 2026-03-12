@@ -53,6 +53,7 @@ void setup() {
   Serial.println("IMU A and B OK");
 
   sensor_calibrateZero();  // hold still: this orientation becomes (0,0,0) for both IMUs
+  control_resetIntegrals();
   float rz, pz, yz;
   sensor_getEulerZeroRad(&rz, &pz, &yz);
   Serial.print("IMU B zero (rad) roll="); Serial.print(rz, 4);

@@ -24,7 +24,7 @@ static const float C2 = -1.0f;      // cos(180°)
 static const float S2 = 0.0f;
 static const float C3 = 0.5f;       // cos(300°)
 static const float S3 = -0.866025f; // sin(300°)
-static const float IK_MAX_TORQUE = 2.0f;
+static const float IK_MAX_TORQUE = 5.0f;
 
 // Remap: swap roll/pitch to match Simulink (remap.py REMAP_SWAP = true)
 #define LQR_REMAP_SWAP 1
@@ -32,8 +32,8 @@ static const float IK_MAX_TORQUE = 2.0f;
 // Torque to velocity scaling for ODrive (tune for your motors)
 static const float K_TAU_TO_VEL = 2.0f;
 static const float VEL_MAX_LQR = 10.0f;
-// Scale down overall velocity commands (0.0 to 1.0). Reduce to soften response.
-static const float VEL_SCALE = 0.25f;
+// Scale down overall velocity commands (0.0 to 1.0). Increase toward 1.0 for stronger response.
+static const float VEL_SCALE = 0.6f;
 
 // LQR deadzone: angle errors within ±5° of (0,0,0) are zeroed (platform can't be perfectly level).
 static const float LQR_DEADZONE_DEG = 0.0f;
@@ -52,6 +52,16 @@ static const float SPEED_TIME_CONSTANT_S = 0.15f;
 static const float SINE_PERIOD_S = 2.0f;
 static const float SINE_AMPL     = 1.0f;
 static const float V_MAX = SINE_AMPL * (TWO_PI / SINE_PERIOD_S);
+
+// Integral state for roll and pitch (anti-drift / steady-state correction)
+static float integral_roll  = 0.0f;
+static float integral_pitch = 0.0f;
+// Integral gain: small, just enough to null steady-state offset. Tune carefully.
+static const float K_I_ROLL  = 5.0f;
+static const float K_I_PITCH = 5.0f;
+// Integral windup clamp (radians·seconds)
+static const float INTEGRAL_CLAMP = 0.3f;
+static uint32_t last_lqr_ms = 0;
 
 static float axis_zero_rad = 0.0f;
 static float dir_smoothed   = 0.0f;
@@ -79,6 +89,12 @@ static void deltaToTargets(float delta_rad, float* dir_target, float* speed_targ
 
 void control_setAxisZero(float axis_zero_rad_in) {
   axis_zero_rad = axis_zero_rad_in;
+}
+
+void control_resetIntegrals(void) {
+  integral_roll  = 0.0f;
+  integral_pitch = 0.0f;
+  last_lqr_ms = 0;
 }
 
 // angle_rad - zero_rad -> velocity; deadband and saturate
@@ -137,6 +153,12 @@ static void ik(float roll_T, float pitch_T, float yaw_T,
 void control_updateLQR(const float x[6], const float x_ref[6],
                         float* v1, float* v2, float* v3,
                         float* tau_roll_out, float* tau_pitch_out, float* tau_yaw_out) {
+  // Compute dt
+  uint32_t now_ms = millis();
+  float dt = (last_lqr_ms == 0) ? 0.01f : (float)(now_ms - last_lqr_ms) * 0.001f;
+  if (dt > 0.1f) dt = 0.1f;
+  last_lqr_ms = now_ms;
+
   // Error: x - x_ref
   float e[6];
   for (int i = 0; i < 6; i++)
@@ -147,11 +169,21 @@ void control_updateLQR(const float x[6], const float x_ref[6],
   if (fabsf(e[1]) < LQR_DEADZONE_RAD) e[1] = 0.0f;
   if (fabsf(e[2]) < LQR_DEADZONE_RAD) e[2] = 0.0f;
 
+  // Integrate angle error (roll and pitch only) for steady-state correction
+  integral_roll  += e[0] * dt;
+  integral_pitch += e[1] * dt;
+  if (integral_roll  >  INTEGRAL_CLAMP) integral_roll  =  INTEGRAL_CLAMP;
+  if (integral_roll  < -INTEGRAL_CLAMP) integral_roll  = -INTEGRAL_CLAMP;
+  if (integral_pitch >  INTEGRAL_CLAMP) integral_pitch =  INTEGRAL_CLAMP;
+  if (integral_pitch < -INTEGRAL_CLAMP) integral_pitch = -INTEGRAL_CLAMP;
+
   // u = -K @ e  -> body torques [tau_roll, tau_pitch, tau_yaw]
   float tau_roll  = -(K_LQR[0][0]*e[0] + K_LQR[0][1]*e[1] + K_LQR[0][2]*e[2] +
-                     K_LQR[0][3]*e[3] + K_LQR[0][4]*e[4] + K_LQR[0][5]*e[5]);
+                     K_LQR[0][3]*e[3] + K_LQR[0][4]*e[4] + K_LQR[0][5]*e[5])
+                   - K_I_ROLL  * integral_roll;
   float tau_pitch = -(K_LQR[1][0]*e[0] + K_LQR[1][1]*e[1] + K_LQR[1][2]*e[2] +
-                     K_LQR[1][3]*e[3] + K_LQR[1][4]*e[4] + K_LQR[1][5]*e[5]);
+                     K_LQR[1][3]*e[3] + K_LQR[1][4]*e[4] + K_LQR[1][5]*e[5])
+                   - K_I_PITCH * integral_pitch;
   float tau_yaw   = -(K_LQR[2][0]*e[0] + K_LQR[2][1]*e[1] + K_LQR[2][2]*e[2] +
                      K_LQR[2][3]*e[3] + K_LQR[2][4]*e[4] + K_LQR[2][5]*e[5]);
 

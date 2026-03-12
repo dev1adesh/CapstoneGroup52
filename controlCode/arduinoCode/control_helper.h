@@ -29,4 +29,7 @@ void control_updateLQR(const float x[6], const float x_ref[6],
                        float* v1, float* v2, float* v3,
                        float* tau_roll_out, float* tau_pitch_out, float* tau_yaw_out);
 
+// Reset integral accumulators (call after recalibration or when resuming balance).
+void control_resetIntegrals(void);
+
 #endif // CONTROL_HELPER_H
